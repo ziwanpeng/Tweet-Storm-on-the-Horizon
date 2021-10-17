@@ -1,0 +1,277 @@
+---
+title: "Tweet Storm on the Horizon"
+author  : "Ziwan Peng"
+date    : "8/3/2021" 
+output:
+  html_document:
+    df_print: paged
+---
+# Overview 
+
+President Trump, love him or hate him or just don’t care, is the most famous & powerful Twitter user of all time. Like it or not, President Trump’s tweets have become a source of information. The New York Times, Wall Street Journal and others news outlets and take a look at President Trump’s Tweets why shouldn’t we? This week let’s put politics aside and let the data do the talking! You can either use my dataset "TrumpQ12020Tweets.csv" or grab the latest tweets from the http://www.trumptwitterarchive.com/. Just be sure to grab enough to do some analysis - i.e. 3 months or more.
+
+## Load Libraries
+
+library(tidyverse)
+library(lubridate)
+library(tidytext)
+library(topicmodels)
+library(wordcloud2)
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(tidytext)
+library(topicmodels)
+library(wordcloud2)
+
+```
+
+### load tweets 
+
+Note the data is pipe delimited( delim = "|") so you'll need to read them with read_delim instead of read_csv, if you read ahead you'll also see that you might need to transform created_at as a date variable (col_types = cols(created_at = col_datetime(format = "%m-%d-%Y %H:%M:%S"))) 
+
+"TrumpQ12020Tweets.csv"
+
+```{r, message=FALSE, warning=FALSE}
+trump <- read_delim("TrumpQ12020Tweets.csv",col_types = cols(created_at = col_datetime(format = "%m-%d-%Y %H:%M:%S")),delim="|")
+trump
+```
+
+## Term Frequency & Wordcloud 
+
+create tweet_freq table
+
+1. create a month_varaible 
+2. parse terms into words, remove the following 
+  - stop words
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+3. summarize by month and word
+4. take top 100 words by month 
+
+create the following three word clouds: 
+1. word cloud of all terms 
+1. word cloud for month 1 
+2. word cloud for month 2 
+3. word cloud for month 3 
+
+answer: what terms jump out at you? 
+Americans, coronavirus, and democrats jump out at me.
+```{r}
+exclude <- c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android","realdonaldtrump")
+words_by_month <- trump %>%
+  mutate(month=month(created_at)) %>%
+  unnest_tokens(word,text) %>%
+  anti_join(stop_words) %>%
+  filter(!word %in% exclude)%>%
+  filter(!str_detect(word,"^\\d")) %>%
+  group_by(month,word)%>%
+  summarise(n=n()) %>%
+  top_n(100,n) %>%
+  ungroup()
+
+tweet_freq <- trump %>%
+  unnest_tokens(word,text) %>%
+  anti_join(stop_words) %>%
+  filter(!word %in% exclude)%>%
+  filter(!str_detect(word,"^\\d")) %>%
+  group_by(word)%>%
+  summarise(n=n()) 
+
+tweet_freq %>%
+  wordcloud2()
+
+words_by_month %>%
+  filter(month==1) %>%
+  select(word,n) %>%
+  wordcloud2()
+  
+words_by_month %>%
+  filter(month==2) %>%
+  select(word,n) %>%
+  wordcloud2()
+
+words_by_month %>%
+  filter(month==3) %>%
+  select(word,n) %>%
+  wordcloud2()
+
+
+```
+
+## Bigram Analysis 
+
+create table bigram_freq by 
+1. create a bigram 
+2. summarize by bigram 
+3. use separate to split bigram into word1 and word2 then filter the following
+  - stop words against both word1 and word2 
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+  - filter digits 
+4. create a bigram varaible by combining word1 and word2 together 
+
+create the following 
+
+1. wordcloud of top 100 bigram terms. 
+2. make a chart of the top 10 terms that come after the word "fake", be sure to use coordinate flip 
+3. make a chart of the top 10 terms that come before the word "media", be sure to use coordinate flip 
+4. make a chart of the top 3 terms that before  "joe", be sure to use coordinate flip 
+
+answer: what jumps out at you? 
+American people and Adam Schiff jump at me.
+
+```{r}
+bigram_freq <- trump %>%
+  unnest_tokens(word, text, token = "ngrams", n = 2, n_min = 2) %>%
+  separate(word, c("word1", "word2"), sep = " ") %>%
+  anti_join(stop_words, by = c("word1" = "word"))%>%
+  anti_join(stop_words, by = c("word2" = "word")) %>%
+  filter(!word1 %in% exclude ) %>%
+  filter(!word2 %in% exclude ) %>%
+  filter(!str_detect(word1,"^\\d")) %>%
+  filter(!str_detect(word2,"^\\d"))  %>%
+  mutate(word=paste(word1,word2,sep=" ")) %>%
+  group_by(word) %>%
+  summarise(n=n())
+
+bigram_freq %>%
+  wordcloud2()
+
+bigram_freq %>%
+  filter(str_starts(word,"fake",negate = FALSE)) %>%
+  top_n(10,n)%>%
+  ggplot(aes(x=reorder(word,n),y=n,fill=n))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Top 10 terms that come after the word fake")
+  
+
+bigram_freq %>%
+  filter(str_ends(word,"media",negate = FALSE)) %>%
+  top_n(10,n)%>%
+  ggplot(aes(x=reorder(word,n),y=n,fill=n))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Top 10 terms that come before the word media")
+
+bigram_freq %>%
+  filter(str_ends(word,"joe",negate = FALSE)) %>%
+  top_n(3,n)%>%
+  ggplot(aes(x=reorder(word,n),y=n,fill=n))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Top 3 terms that come before the word joe")
+
+```
+
+
+## Sentiments
+
+create sentiment_by_month 
+1. inner join words_by_month to "bing" sentiments 
+2. group by month and sentiment 
+3. get the top 10 words by month 
+4. make words with negative sentiment negative (-n) and positive words positive
+
+create the following bar charts 
+
+1. chart 1 sentiment for month 1, besure to order n, and coord_flip 
+2. chart 1 sentiment for month 2, besure to order n, and coord_flip 
+3. chart 1 sentiment for month 3, besure to order n, and coord_flip 
+
+Answer: what if anything does this tell you? 
+Trumps' tweets are getting more positive.
+```{r}
+sentiment_by_month  <- words_by_month %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(month,sentiment) %>%
+  top_n(10,n)%>%
+  mutate(n=if_else(sentiment=="negative",-n,n))
+
+sentiment_by_month %>%
+  filter(month==1) %>%
+  ggplot(aes(x=reorder(sentiment,n),y=n,fill=sentiment))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Sentiment for month 1")
+
+sentiment_by_month %>%
+  filter(month==2) %>%
+  ggplot(aes(x=reorder(sentiment,n),y=n,fill=sentiment))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Sentiment for month 2")
+
+sentiment_by_month %>%
+  filter(month==3) %>%
+  ggplot(aes(x=reorder(sentiment,n),y=n,fill=sentiment))+
+  geom_col(show.legend = FALSE)+
+  coord_flip() +
+  labs(x = NULL, y = "frequency",title = "Sentiment for month 3")
+
+
+sentiment_by_month %>%
+  filter(!is.na(month))%>%
+  ggplot(aes(x=factor(month),y=n,fill=sentiment))+
+  geom_col()+
+  coord_flip() +
+  labs(x = "month", y = "frequency",title = "Sentiment for three months")
+```
+
+## Topic Prep 
+
+Create tweet_dtm by preparing a Document Term Matrix (dtm) 
+
+1. unnest tokens into words 
+2. remove the following 
+  - stop words
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+3. summarize by id_str (tweet id) and word
+4. take top 20 words by id 
+
+create tweet_lda by taking your tweet_dtm, pick a value of k (4,6,8 or 10)
+
+
+```{r}
+tweet_dtm <- trump %>%
+  unnest_tokens(word,text) %>%
+  anti_join(stop_words)%>%
+  filter(!str_detect(word,"^\\d")) %>%
+  filter(!word %in% exclude) %>%
+  group_by(id_str,word)%>%
+  summarise(n=n()) %>%
+  top_n(20,n)%>%
+  cast_dtm(id_str, word, n)
+
+tweet_lda <-tweet_dtm %>%
+  LDA(., k = 6, control = list(seed = 1234))
+
+```
+
+
+## Topic Model 
+
+1. document term matrix needs to be cleaned up and generate beta 
+2. generate topic terms by extracting top_n by beta 
+3. plot your topics 
+
+Answer what topics did you identify? 
+fake news; impeachment; senate ;amarican people;coronarvirus; democrats
+```{r}
+tidy(tweet_lda,matrix = "beta") %>%
+  group_by(topic)%>%
+  top_n(5,beta) %>%
+  ungroup()%>%
+  arrange(desc(beta))%>%
+  ggplot(aes(x=reorder(term,beta),y=beta,fill=as.factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic,ncol=2, scales = "free") +
+  coord_flip()
+```
+
+
+## Finally, 
+
+Based on your analysis of President Trump's tweets, what stood out to you? what did you think about this type of analysis. Write up your thoughts on this analysis. 
+
+President Trump's tweets are completely political. Along COVID break out since Jan 2020, he changed the tweets sentiment as more positive to hedge the negative attack by COVID and shaped the American people's confidence to fight against this pandemic. Therefore, he focused more on the accurancy of news on all kinds of media. But in the same time, he had to defend his presidency and republican government against democrats about the impeachment. Based on this analysis, we can witness what president trump's biggest attention is during the first 3 months in 2020.
