@@ -8,7 +8,10 @@ output:
 ---
 # Overview 
 
-President Trump, love him or hate him or just don’t care, is the most famous & powerful Twitter user of all time. Like it or not, President Trump’s tweets have become a source of information. The New York Times, Wall Street Journal and others news outlets and take a look at President Trump’s Tweets why shouldn’t we? This week let’s put politics aside and let the data do the talking! You can either use my dataset "TrumpQ12020Tweets.csv" or grab the latest tweets from the http://www.trumptwitterarchive.com/. Just be sure to grab enough to do some analysis - i.e. 3 months or more.
+President Trump, love him or hate him or just don’t care, is the most famous & powerful Twitter user of all time. Like it or not,
+President Trump’s tweets have become a source of information. 
+The New York Times, Wall Street Journal and others news outlets and take a look at President Trump’s Tweets why shouldn’t we? 
+This week let’s put politics aside and let the data do the talking! 
 
 ## Load Libraries
 
